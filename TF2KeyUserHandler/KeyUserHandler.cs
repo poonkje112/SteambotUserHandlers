@@ -14,13 +14,13 @@ namespace SteamBot
 		//PRICE SETTINGS
 		//PRICE IN SCRAPS
 		//6.55
-        static int SellPricePerKey = 59;// price in scrap, e.g. 31 / 9 = 3.55 ref
+        static int SellPricePerKey = 153;// price in scrap, e.g. 31 / 9 = 3.55 ref
         //6.44
-		static int BuyPricePerKey = 58; // price in scrap, e.g. 29 / 9 = 3.33 ref
+		static int BuyPricePerKey = 147; // price in scrap, e.g. 29 / 9 = 3.33 ref
 		
 		//SHOW PRICES SETTINGS
-        static string show_sell_price = "6.55";
-        static string show_buy_price = "6.44";
+        static string show_sell_price = "17";
+        static string show_buy_price = "16.66";
 
         static int TimerInterval = 170000;
         static int InviteTimerInterval = 2000;
@@ -87,10 +87,16 @@ namespace SteamBot
                 Bot.SteamFriends.SendChatMessage(OtherSID, type, "Hello, I'm a key bot! Add me to trade so we can get started!");
             }
 
+
+            if (message.Contains("trade"))
+            {
+                Bot.OpenTrade(OtherSID);
+            }
+
             //REGULAR chat commands
             if (message.Contains("buying") || message.Contains("what") || message.Contains("how many") || message.Contains("how much") || message.Contains("price") || message.Contains("selling"))
             {
-                Bot.SteamFriends.SendChatMessage(OtherSID, type, "I am currently buying keys at 6.44 Ref and selling at 6.55 Ref.");
+                Bot.SteamFriends.SendChatMessage(OtherSID, type, "I am currently buying keys at " + show_buy_price + " Ref and selling at " + show_sell_price +" Ref.");
             }
             else if ((message.Contains("love") || message.Contains("luv") || message.Contains("<3")) && (message.Contains("y") || message.Contains("u")))
             {
@@ -272,9 +278,7 @@ namespace SteamBot
                 }
                 else if (message == ".removeall")
                 {
-                    // Commenting this out because RemoveAllFriends is a custom function I wrote.
-                    //Bot.SteamFriends.RemoveAllFriends();
-                    //Bot.log.Warn("Removed all friends from my friends list.");
+                    // No up to date way to remove friends found yet! 30-12-2015
                 }
             }
             else
