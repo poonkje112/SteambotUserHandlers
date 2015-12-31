@@ -4,44 +4,59 @@ using SteamTrade;
 using System;
 using System.Timers;
 using SteamTrade.TradeWebAPI;
+using TradeAsset = SteamTrade.TradeOffer.TradeOffer.TradeStatusUser.TradeAsset;
+using SteamTrade.TradeOffer;
 
 namespace SteamBot
 {
     public class KeyUserHandler : UserHandler
     {
         static string BotVersion = "2.4.0";
-		
-		//PRICE SETTINGS
-		//PRICE IN SCRAPS
-		//6.55
-        static int SellPricePerKey = 153;// price in scrap, e.g. 31 / 9 = 3.55 ref
+
+        //PRICE SETTINGS
+        //PRICE IN SCRAPS
+        //6.55
+        static int SellPricePerKey = BuyPricePerKey + 4;// price in scrap, e.g. 31 / 9 = 3.55 ref
         //6.44
-		static int BuyPricePerKey = 147; // price in scrap, e.g. 29 / 9 = 3.33 ref
-		
-		//SHOW PRICES SETTINGS
-        static string show_sell_price = "17";
-        static string show_buy_price = "16.66";
+        static int BuyPricePerKey = 154; // price in scrap, e.g. 29 / 9 = 3.33 ref
+
+        //SHOW PRICES SETTINGS
+        static double show_sell_price = 17.55;
+        static double show_buy_price = 17.11;
 
         static int TimerInterval = 170000;
         static int InviteTimerInterval = 2000;
 
-        int UserMetalAdded,UserScrapAdded,UserRecAdded,UserRefAdded,UserKeysAdded,BotKeysAdded,BotMetalAdded,BotScrapAdded,BotRecAdded,BotRefAdded,InventoryMetal,InventoryScrap,InventoryRec,InventoryRef,InventoryKeys,OverpayNumKeys,ExcessInScrap,PreviousKeys,WhileLoop,InvalidItem = 0;
-        
+        // NEW ------------------------------------------------------------------
+        private readonly GenericInventory mySteamInventory;
+        private readonly GenericInventory OtherSteamInventory;
+
+        private bool tested;
+        // ----------------------------------------------------------------------
+
+
+
+        int UserMetalAdded, UserScrapAdded, UserRecAdded, UserRefAdded, UserKeysAdded, BotKeysAdded, BotMetalAdded, BotScrapAdded, BotRecAdded, BotRefAdded, InventoryMetal, InventoryScrap, InventoryRec, InventoryRef, InventoryKeys, OverpayNumKeys, ExcessInScrap, PreviousKeys, WhileLoop, InvalidItem = 0;
+
         double ExcessRefined = 0.0;
 
-        bool InGroupChat,TimerEnabled,HasRun,HasErrorRun,ChooseDonate,AskOverpay,IsOverpaying,HasCounted = false;
+        bool InGroupChat, TimerEnabled, HasRun, HasErrorRun, ChooseDonate, AskOverpay, IsOverpaying, HasCounted = false;
         bool TimerDisabled = true;
 
         ulong uid;
         SteamID currentSID;
+        SteamID ownerSID = 76561198075097366;
 
         Timer adTimer = new System.Timers.Timer(TimerInterval);
         Timer inviteMsgTimer = new System.Timers.Timer(InviteTimerInterval);
 
-        public KeyUserHandler(Bot bot, SteamID sid) : base(bot, sid)
+        public KeyUserHandler(Bot bot, SteamID sid)
+            : base(bot, sid)
         {
-            
+            mySteamInventory = new GenericInventory(SteamWeb);
+            OtherSteamInventory = new GenericInventory(SteamWeb);
         }
+
 
         public override void OnLoginCompleted()
         {
@@ -80,23 +95,59 @@ namespace SteamBot
 
         public override void OnMessage(string message, EChatEntryType type)
         {
-            Bot.log.Warn("Message in the chat: "+message);
+            Bot.log.Warn("Message in the chat: " + message);
             message = message.ToLower();
 
-            if(message.Contains("hi") || message.Contains("hello") || message.Contains("sup") || message.Contains("hey")){
-                Bot.SteamFriends.SendChatMessage(OtherSID, type, "Hello, I'm a key bot! Add me to trade so we can get started!");
+            if (message.Contains("hi") || message.Contains("hello") || message.Contains("sup") || message.Contains("hey"))
+            {
+                Bot.SteamFriends.SendChatMessage(OtherSID, type, "Hello, to get started with trading type: trade or invite me to trade.");
+                Bot.SteamFriends.SendChatMessage(OtherSID, type, "To see a list of commands type: help");
+
+                /** NEW */
+                if (IsAdmin)
+                {
+                    //creating a new trade offer
+                    var offer = Bot.NewTradeOffer(OtherSID);
+
+                    //offer.Items.AddMyItem(0, 0, 0);
+                    if (offer.Items.NewVersion)
+                    {
+                        string newOfferId;
+                        if (offer.Send(out newOfferId))
+                        {
+                            Bot.AcceptAllMobileTradeConfirmations();
+                            Log.Success("Trade offer sent : Offer ID " + newOfferId);
+                        }
+                    }
+
+                    //creating a new trade offer with token
+                    var offerWithToken = Bot.NewTradeOffer(OtherSID);
+
+                    //offer.Items.AddMyItem(0, 0, 0);
+                    if (offerWithToken.Items.NewVersion)
+                    {
+                        string newOfferId;
+                        // "token" should be replaced with the actual token from the other user
+                        if (offerWithToken.SendWithToken(out newOfferId, "token"))
+                        {
+                            Bot.AcceptAllMobileTradeConfirmations();
+                            Log.Success("Trade offer sent : Offer ID " + newOfferId);
+                        }
+                    }
+                }
             }
 
+            //REGULAR chat commands
 
             if (message.Contains("trade"))
             {
                 Bot.OpenTrade(OtherSID);
             }
 
-            //REGULAR chat commands
-            if (message.Contains("buying") || message.Contains("what") || message.Contains("how many") || message.Contains("how much") || message.Contains("price") || message.Contains("selling"))
+
+            if (message.Contains("price"))
             {
-                Bot.SteamFriends.SendChatMessage(OtherSID, type, "I am currently buying keys at " + show_buy_price + " Ref and selling at " + show_sell_price +" Ref.");
+                Bot.SteamFriends.SendChatMessage(OtherSID, type, "I am currently buying keys at " + show_buy_price + " Ref and selling at " + show_sell_price + " Ref.");
             }
             else if ((message.Contains("love") || message.Contains("luv") || message.Contains("<3")) && (message.Contains("y") || message.Contains("u")))
             {
@@ -109,17 +160,9 @@ namespace SteamBot
                     Bot.SteamFriends.SendChatMessage(OtherSID, type, "I'd love you if I could, but robots are uncapable of love.");
                 }
             }
-            else if (message.Contains("stock"))
-            {
-                Bot.SteamFriends.SendChatMessage(OtherSID, type, "Current stock is displayed in trade");
-            }
             else if (message.Contains("fuck") || message.Contains("suck") || message.Contains("dick") || message.Contains("cock") || message.Contains("tit") || message.Contains("boob") || message.Contains("pussy") || message.Contains("vagina") || message.Contains("cunt") || message.Contains("penis"))
             {
                 Bot.SteamFriends.SendChatMessage(OtherSID, type, "Sorry, but as a robot I cannot perform sexual functions.");
-            }
-            else if (message.Contains("thank"))
-            {
-                Bot.SteamFriends.SendChatMessage(OtherSID, type, "You're welcome!");
             }
             else if (message == "donate")
             {
@@ -127,15 +170,13 @@ namespace SteamBot
             }
             else if (message == "owner")
             {
-                Bot.SteamFriends.SendChatMessage(OtherSID, type, "Here is a link to my owners profile http://steamcommunity.com/id/z3ndrex");
-            }
-            else if (message == "who")
-            {
-                Bot.SteamFriends.SendChatMessage(OtherSID, type, "Here is a link to my owners profile http://steamcommunity.com/id/z3ndrex");
+                Bot.SteamFriends.SendChatMessage(OtherSID, type, "Here is a link to my owners profile http://steamcommunity.com/id/poonkje112/");
             }
             else if (message.Contains("help"))
             {
-                Bot.SteamFriends.SendChatMessage(OtherSID, EChatEntryType.ChatMsg, "Hi. Thanks for using key bot! Trade me, then simply put up your keys or metal and I will add my keys or metal automatically. I also accept donations of either keys or metal. To donate, type \"donate\" in the trade window!");
+                Bot.SteamFriends.SendChatMessage(OtherSID, type, "To start trading type: trade");
+                Bot.SteamFriends.SendChatMessage(OtherSID, type, "If you want to see my current prices please type: price");
+                Bot.SteamFriends.SendChatMessage(OtherSID, type, "Have you found a bug or ran into a problem and need hel please type: owner");
             }
             // ADMIN commands
             else if (IsAdmin)
@@ -225,6 +266,42 @@ namespace SteamBot
                         Bot.SteamFriends.SendChatMessage(OtherSID, type, "I need more arguments. Current buying price: " + BuyPricePerKey + " scrap.");
                     }
                 }
+                else if (message.StartsWith(".setsell"))
+                {
+                    // Usage: .sell newprice "e.g. sell 26"
+                    double show_new_sell_price = 0;
+                    if (message.Length >= 9)
+                    {
+                        Bot.SteamFriends.SendChatMessage(OtherSID, type, "Current selling price: " + show_sell_price + " ref.");
+                        double.TryParse(message.Substring(8), out show_new_sell_price);
+                        Bot.log.Success("Admin has requested that I set the new selling price from " + show_sell_price + " ref to " + show_new_sell_price + " ref.");
+                        show_sell_price = show_new_sell_price;
+                        Bot.SteamFriends.SendChatMessage(OtherSID, type, "Setting new selling price to: " + show_sell_price + " ref.");
+                        Bot.log.Success("Successfully set new price.");
+                    }
+                    else
+                    {
+                        Bot.SteamFriends.SendChatMessage(OtherSID, type, "I need more arguments. Current selling price: " + SellPricePerKey + " scrap.");
+                    }
+                }
+                else if (message.StartsWith(".setbuy"))
+                {
+                    // Usage: .buy newprice "e.g. .buy 24"
+                    double show_new_buy_price = 0;
+                    if (message.Length >= 8)
+                    {
+                        Bot.SteamFriends.SendChatMessage(OtherSID, type, "Current buying price: " + show_buy_price + "ref.");
+                        double.TryParse(message.Substring(7), out show_new_buy_price);
+                        Bot.log.Success("Admin has requested that I set the new selling price from " + show_buy_price + " ref to " + show_new_buy_price + "ref.");
+                        show_buy_price = show_new_buy_price;
+                        Bot.SteamFriends.SendChatMessage(OtherSID, type, "Setting new buying price to: " + show_buy_price + " ref.");
+                        Bot.log.Success("Successfully set new price.");
+                    }
+                    else
+                    {
+                        Bot.SteamFriends.SendChatMessage(OtherSID, type, "I need more arguments. Current buying price: " + show_buy_price + " ref.");
+                    }
+                }
                 else if (message.StartsWith(".gmessage"))
                 {
                     // usage: say ".gmessage Hello!" to the bot will send "Hello!" into group chat
@@ -278,7 +355,9 @@ namespace SteamBot
                 }
                 else if (message == ".removeall")
                 {
-                    // No up to date way to remove friends found yet! 30-12-2015
+                    // Commenting this out because RemoveAllFriends is a custom function I wrote.
+                    //Bot.SteamFriends.RemoveAllFriends();
+                    //Bot.log.Warn("Removed all friends from my friends list.");
                 }
             }
             else
@@ -287,12 +366,16 @@ namespace SteamBot
             }
         }
 
-   
 
+        EChatEntryType type2;
         public override bool OnTradeRequest()
         {
-            Bot.log.Success(Bot.SteamFriends.GetFriendPersonaName(OtherSID) + " (" + OtherSID.ToString() + ") has requested to trade with me!");
-            return true;
+            //Bot.log.Success(Bot.SteamFriends.GetFriendPersonaName(OtherSID) + " (" + OtherSID.ToString() + ") has requested to trade with me!");
+            
+            Bot.SteamFriends.SendChatMessage(OtherSID, type2, "I'm sending you a trade offer in 5 secconds!");
+            System.Threading.Thread.Sleep(5000);
+            Bot.OpenTrade(OtherSID);
+            return false;
         }
 
         public override void OnTradeError(string error)
@@ -304,7 +387,7 @@ namespace SteamBot
             Bot.log.Warn(error);
             if (!HasErrorRun)
             {
-                Bot.SteamFriends.SendChatMessage(OtherSID, EChatEntryType.ChatMsg, "Did something go horribly wrong? If you have found a bug or something that you think wasn't supposed to happen, please leave a message on my profile! ");
+                Bot.SteamFriends.SendChatMessage(OtherSID, EChatEntryType.ChatMsg, "Oops something went wrong! Error: " + error);
                 HasErrorRun = true;
             }
             Bot.SteamFriends.SetPersonaState(EPersonaState.Online);
@@ -320,13 +403,39 @@ namespace SteamBot
 
         public override void OnTradeInit()
         {
-          ReInit();
-          TradeCountInventory(true);
+            ReInit();
+            TradeCountInventory(true);
+            // NEW -------------------------------------------------------------------------------
+            List<long> contextId = new List<long>();
+            tested = false;
 
-         
+            /*************************************************************************************
+             * 
+             * SteamInventory AppId = 753 
+             * 
+             *  Context Id      Description
+             *      1           Gifts (Games), must be public on steam profile in order to work.
+             *      6           Trading Cards, Emoticons & Backgrounds. 
+             *  
+             ************************************************************************************/
+
+            contextId.Add(1);
+            contextId.Add(6);
+
+            mySteamInventory.load(753, contextId, Bot.SteamClient.SteamID);
+            OtherSteamInventory.load(753, contextId, OtherSID);
+
+            if (!mySteamInventory.isLoaded | !OtherSteamInventory.isLoaded)
+            {
+                SendTradeMessage("Couldn't open an inventory, type 'errors' for more info.");
+            }
+
+            SendTradeMessage("Type 'test' to start.");
+            // -----------------------------------------------------------------------------------
+
             if (InventoryKeys == 0)
             {
-                Trade.SendMessage("I don't have any keys to sell right now! I am currently buying keys for " + show_buy_price+ " ref.");
+                Trade.SendMessage("I don't have any keys to sell right now! I am currently buying keys for " + show_buy_price + " ref.");
             }
             else if (InventoryMetal < BuyPricePerKey)
             {
@@ -334,163 +443,178 @@ namespace SteamBot
             }
             else
             {
-              Trade.SendMessage("I am currently buying keys for " + show_buy_price + " ref, and selling keys for " + show_sell_price + " ref.");
+                Trade.SendMessage("I am currently buying keys for " + show_buy_price + " ref, and selling keys for " + show_sell_price + " ref.");
             }
             Bot.SteamFriends.SetPersonaState(EPersonaState.Busy);
         }
 
         public override void OnTradeAddItem(Schema.Item schemaItem, Inventory.Item inventoryItem)
         {
-            var item = Trade.CurrentSchema.GetItem(schemaItem.Defindex);
+            switch (inventoryItem.AppId)
+            {
+                case 440:
+                    var item = Trade.CurrentSchema.GetItem(schemaItem.Defindex);
 
-            if (!HasCounted)
-            {
-                Trade.SendMessage("ERROR: I haven't finished counting my inventory yet! Please remove any items you added, and then re-add them or there could be errors.");
-            }
-            else if (InvalidItem >= 4)
-            {
-                Trade.CancelTrade();
-                Bot.SteamFriends.SendChatMessage(OtherSID, EChatEntryType.ChatMsg, "Please stop messing around. I am used for buying and selling keys only. I can only accept metal or keys as payment.");
-                Bot.log.Warn("Booted user for messing around.");
-                Bot.SteamFriends.SetPersonaState(EPersonaState.Online);
-            }
-            else if (item.Defindex == 5000)
-            {
-                // Put up scrap metal
-                UserMetalAdded++;
-                UserScrapAdded++;
-                Bot.log.Success("User added: " + item.ItemName);
-            }
-            else if (item.Defindex == 5001)
-            {
-                // Put up reclaimed metal
-                UserMetalAdded += 3;
-                UserRecAdded++;
-                Bot.log.Success("User added: " + item.ItemName);
-            }
-            else if (item.Defindex == 5002)
-            {
-                // Put up refined metal
-                UserMetalAdded += 9;
-                UserRefAdded++;
-                Bot.log.Success("User added: " + item.ItemName);
-            }
-            else if (item.Defindex == 5021)
-            {
-                // Put up keys
-                UserKeysAdded++;
-                Bot.log.Success("User added: " + item.ItemName);
-                // USER IS SELLING KEYS
-                if (!ChooseDonate)
-                {
-                    // BOT ADDS METAL
-                    int KeysToScrap = UserKeysAdded * BuyPricePerKey;
-                    if (InventoryMetal < KeysToScrap)
+                    if (!HasCounted)
                     {
-                        Trade.SendMessage("I only have " + InventoryMetal + " scrap. You need to remove some keys.");
-                        Bot.log.Warn("I don't have enough metal for the user.");
+                        Trade.SendMessage("ERROR: I haven't finished counting my inventory yet! Please remove any items you added, and then re-add them or there could be errors.");
+                    }
+                    else if (InvalidItem >= 4)
+                    {
+                        Trade.CancelTrade();
+                        Bot.SteamFriends.SendChatMessage(OtherSID, EChatEntryType.ChatMsg, "Please stop messing around. I am used for buying and selling keys only. I can only accept metal or keys as payment.");
+                        Bot.log.Warn("Booted user for messing around.");
+                        Bot.SteamFriends.SetPersonaState(EPersonaState.Online);
+                    }
+                    else if (item.Defindex == 5000)
+                    {
+                        // Put up scrap metal
+                        UserMetalAdded++;
+                        UserScrapAdded++;
+                        Bot.log.Success("User added: " + item.ItemName);
+                    }
+                    else if (item.Defindex == 5001)
+                    {
+                        // Put up reclaimed metal
+                        UserMetalAdded += 3;
+                        UserRecAdded++;
+                        Bot.log.Success("User added: " + item.ItemName);
+                    }
+                    else if (item.Defindex == 5002)
+                    {
+                        // Put up refined metal
+                        UserMetalAdded += 9;
+                        UserRefAdded++;
+                        Bot.log.Success("User added: " + item.ItemName);
+                    }
+                    else if (item.Defindex == 5021)
+                    {
+                        // Put up keys
+                        UserKeysAdded++;
+                        Bot.log.Success("User added: " + item.ItemName);
+                        // USER IS SELLING KEYS
+                        if (!ChooseDonate)
+                        {
+                            // BOT ADDS METAL
+                            int KeysToScrap = UserKeysAdded * BuyPricePerKey;
+                            if (InventoryMetal < KeysToScrap)
+                            {
+                                Trade.SendMessage("I only have " + InventoryMetal + " scrap. You need to remove some keys.");
+                                Bot.log.Warn("I don't have enough metal for the user.");
+                            }
+                            else
+                            {
+                                Trade.SendMessage("You have given me " + UserKeysAdded + " key(s). I will give you " + KeysToScrap + " scrap.");
+                                Bot.log.Success("User gave me " + UserKeysAdded + " key(s). I will now give him " + KeysToScrap + " scrap.");
+                                // Put up required metal
+                                bool DoneAddingMetal = false;
+                                while (!DoneAddingMetal)
+                                {
+                                    if (InventoryRef > 0 && BotMetalAdded + 9 <= KeysToScrap)
+                                    {
+                                        Trade.AddItemByDefindex(5002);
+                                        Bot.log.Warn("I added Refined Metal.");
+                                        BotMetalAdded += 9;
+                                        BotRefAdded++;
+                                        InventoryRef--;
+                                    }
+                                    else if (InventoryRec > 0 && BotMetalAdded + 3 <= KeysToScrap)
+                                    {
+                                        Trade.AddItemByDefindex(5001);
+                                        Bot.log.Warn("I added Reclaimed Metal.");
+                                        BotMetalAdded += 3;
+                                        BotRecAdded++;
+                                        InventoryRec--;
+                                    }
+                                    else if (InventoryScrap > 0 && BotMetalAdded + 1 <= KeysToScrap)
+                                    {
+                                        Trade.AddItemByDefindex(5000);
+                                        Bot.log.Warn("I added Scrap Metal.");
+                                        BotMetalAdded++;
+                                        BotScrapAdded++;
+                                        InventoryScrap--;
+                                    }
+                                    else if (InventoryScrap == 0 && BotMetalAdded + 2 == KeysToScrap)
+                                    {
+                                        Trade.SendMessage("Sorry, but I don't have enough metal to give you! Please remove some keys or add two keys.");
+                                        Bot.log.Warn("Couldn't add enough metal for the user!");
+                                        DoneAddingMetal = true;
+                                    }
+                                    else if (InventoryScrap == 0 && BotMetalAdded + 1 == KeysToScrap)
+                                    {
+                                        Trade.SendMessage("Sorry, but I don't have enough metal to give you! Please remove some keys or add a key.");
+                                        Bot.log.Warn("Couldn't add enough metal for the user!");
+                                        DoneAddingMetal = true;
+                                    }
+                                    else if (BotMetalAdded == KeysToScrap)
+                                    {
+                                        Trade.SendMessage("Added enough metal. " + BotRefAdded + " ref, " + BotRecAdded + " rec, " + BotScrapAdded + " scrap.");
+                                        Bot.log.Success("Gave user enough metal!");
+                                        DoneAddingMetal = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else if (item.Defindex == 5049 || item.Defindex == 5067 || item.Defindex == 5072 || item.Defindex == 5073 || item.Defindex == 5079 || item.Defindex == 5081 || item.Defindex == 5628 || item.Defindex == 5631 || item.Defindex == 5632)
+                    {
+                        Trade.SendMessage("I'm sorry but I can't accept " + item.ItemName + "! This key used to be a special key such as a winter key that has turned back into a normal one. Unfortunately the ID is different and I am not coded to handle them at the moment. Please remove it and exchange it for a normal key!");
+                        Bot.log.Warn("User added a special key, but I cannot accept it.");
                     }
                     else
                     {
-                        Trade.SendMessage("You have given me " + UserKeysAdded + " key(s). I will give you " + KeysToScrap + " scrap.");
-                        Bot.log.Success("User gave me " + UserKeysAdded + " key(s). I will now give him " + KeysToScrap + " scrap.");
-                        // Put up required metal
-                        bool DoneAddingMetal = false;
-                        while (!DoneAddingMetal)
-                        {
-                            if (InventoryRef > 0 && BotMetalAdded + 9 <= KeysToScrap)
-                            {
-                                Trade.AddItemByDefindex(5002);
-                                Bot.log.Warn("I added Refined Metal.");
-                                BotMetalAdded += 9;
-                                BotRefAdded++;
-                                InventoryRef--;
-                            }
-                            else if (InventoryRec > 0 && BotMetalAdded + 3 <= KeysToScrap)
-                            {
-                                Trade.AddItemByDefindex(5001);
-                                Bot.log.Warn("I added Reclaimed Metal.");
-                                BotMetalAdded += 3;
-                                BotRecAdded++;
-                                InventoryRec--;
-                            }
-                            else if (InventoryScrap > 0 && BotMetalAdded + 1 <= KeysToScrap)
-                            {
-                                Trade.AddItemByDefindex(5000);
-                                Bot.log.Warn("I added Scrap Metal.");
-                                BotMetalAdded++;
-                                BotScrapAdded++;
-                                InventoryScrap--;
-                            }
-                            else if (InventoryScrap == 0 && BotMetalAdded + 2 == KeysToScrap)
-                            {
-                                Trade.SendMessage("Sorry, but I don't have enough scrap metal to give you! Please remove some keys or add two keys.");
-                                Bot.log.Warn("Couldn't add enough metal for the user!");
-                                DoneAddingMetal = true;
-                            }
-                            else if (InventoryScrap == 0 && BotMetalAdded + 1 == KeysToScrap)
-                            {
-                                Trade.SendMessage("Sorry, but I don't have enough scrap metal to give you! Please remove some keys or add a key.");
-                                Bot.log.Warn("Couldn't add enough metal for the user!");
-                                DoneAddingMetal = true;
-                            }
-                            else if (BotMetalAdded == KeysToScrap)
-                            {
-                                Trade.SendMessage("Added enough metal. " + BotRefAdded + " ref, " + BotRecAdded + " rec, " + BotScrapAdded + " scrap.");
-                                Bot.log.Success("Gave user enough metal!");
-                                DoneAddingMetal = true;
-                            }
-                        }
+                        // Put up other items
+                        Trade.SendMessage("Sorry, I don't accept " + item.ItemName + " Defindex: " + item.Defindex + "! I only accept metal/keys. Please remove it from the trade to continue.");
+                        Bot.log.Warn("User added:  " + item.ItemName);
+                        InvalidItem++;
                     }
-                }
-            }
-            else if (item.Defindex == 5049 || item.Defindex == 5067 || item.Defindex == 5072 || item.Defindex == 5073 || item.Defindex == 5079 || item.Defindex == 5081 || item.Defindex == 5628 || item.Defindex == 5631 || item.Defindex == 5632)
-            {
-                Trade.SendMessage("I'm sorry but I can't accept " + item.ItemName + "! This key used to be a special key such as a winter key that has turned back into a normal one. Unfortunately the ID is different and I am not coded to handle them at the moment. Please remove it and exchange it for a normal key!");
-                Bot.log.Warn("User added a special key, but I cannot accept it.");
-            }
-            else
-            {
-                // Put up other items
-                Trade.SendMessage("Sorry, I don't accept " + item.ItemName + "! I only accept metal/keys. Please remove it from the trade to continue.");
-                Bot.log.Warn("User added:  " + item.ItemName);
-                InvalidItem++;
-            }
-            // USER IS BUYING KEYS
-            if (!ChooseDonate)
-            {
-                if (UserMetalAdded % SellPricePerKey >= 0 && UserMetalAdded > 0)
-                {
-                    // Count refined and convert to keys -- X scrap per key
-                    int NumKeys = UserMetalAdded / SellPricePerKey;
-                    if (NumKeys > 0 && NumKeys != PreviousKeys)
+                    // USER IS BUYING KEYS
+                    if (!ChooseDonate)
                     {
-                        Trade.SendMessage("You put up enough metal for " + NumKeys + " key(s). Adding your keys now.");
-                        Bot.log.Success("User put up enough metal for " + NumKeys + " key(s).");
-                        if (NumKeys > InventoryKeys)
+                        if (UserMetalAdded % SellPricePerKey >= 0 && UserMetalAdded > 0)
                         {
-                            double excess = ((NumKeys - BotKeysAdded) * SellPricePerKey) / 9.0;
-                            string refined = string.Format("{0:N2}", excess);
-                            Trade.SendMessage("I only have " + InventoryKeys + " in my backpack. :(");
-                            Bot.log.Warn("User wanted to buy " + NumKeys + " key(s), but I only have " + InventoryKeys + " key(s).");
-                            Trade.SendMessage("Please remove " + refined + " ref.");
-                            NumKeys = InventoryKeys;
-                        }
-                        // Add the keys to the trade window
-                        for (int count = BotKeysAdded; count < NumKeys; count++)
-                        {
-                            Trade.AddItemByDefindex(5021);
-                            Bot.log.Warn("I am adding Mann Co. Supply Crate Key.");
-                            BotKeysAdded++;
+                            // Count refined and convert to keys -- X scrap per key
+                            int NumKeys = UserMetalAdded / SellPricePerKey;
+                            if (NumKeys > 0 && NumKeys != PreviousKeys)
+                            {
+                                Trade.SendMessage("You put up enough metal for " + NumKeys + " key(s). Adding your keys now.");
+                                Bot.log.Success("User put up enough metal for " + NumKeys + " key(s).");
+                                if (NumKeys > InventoryKeys)
+                                {
+                                    double excess = ((NumKeys - BotKeysAdded) * SellPricePerKey) / 9.0;
+                                    string refined = string.Format("{0:N2}", excess);
+                                    Trade.SendMessage("I only have " + InventoryKeys + " in my backpack. :(");
+                                    Bot.log.Warn("User wanted to buy " + NumKeys + " key(s), but I only have " + InventoryKeys + " key(s).");
+                                    Trade.SendMessage("Please remove " + refined + " ref.");
+                                    NumKeys = InventoryKeys;
+                                }
+                                // Add the keys to the trade window
+                                for (int count = BotKeysAdded; count < NumKeys; count++)
+                                {
+                                    Trade.AddItemByDefindex(5021);
+                                    Bot.log.Warn("I am adding Mann Co. Supply Crate Key.");
+                                    BotKeysAdded++;
 
-                            //BUG FIX KEYS 1/2
-                            //InventoryKey--;
+                                    //BUG FIX KEYS 1/2
+                                    //InventoryKey--;
+                                }
+                                Trade.SendMessage("I have added " + BotKeysAdded + " key(s) for you.");
+                                Bot.log.Success("I have added " + BotKeysAdded + " key(s) for the user.");
+                                PreviousKeys = NumKeys;
+                            }
                         }
-                        Trade.SendMessage("I have added " + BotKeysAdded + " key(s) for you.");
-                        Bot.log.Success("I have added " + BotKeysAdded + " key(s) for the user.");
-                        PreviousKeys = NumKeys;
                     }
-                }
+                    break;
+                case 753:
+                    GenericInventory.ItemDescription tmpDescription = OtherSteamInventory.getDescription(inventoryItem.Id);
+                    SendTradeMessage("Steam Inventory Item Added.");
+                    SendTradeMessage("Type: {0}", tmpDescription.type);
+                    SendTradeMessage("Marketable: {0}", (tmpDescription.marketable ? "Yes" : "No"));
+                    break;
+
+                default:
+                    SendTradeMessage("Unknown item");
+                    break;
             }
         }
 
@@ -534,7 +658,7 @@ namespace SteamBot
                 Bot.log.Warn("User removed: " + item.ItemName);
             }
             // User removes key from trade
-            if (UserKeysAdded < (float) BotMetalAdded / BuyPricePerKey)
+            if (UserKeysAdded < (float)BotMetalAdded / BuyPricePerKey)
             {
                 int KeysToScrap = UserKeysAdded * BuyPricePerKey;
                 bool DoneAddingMetal = false;
@@ -578,7 +702,7 @@ namespace SteamBot
                 }
             }
             // User removes metal from trade
-            while ((float) UserMetalAdded / SellPricePerKey < BotKeysAdded)
+            while ((float)UserMetalAdded / SellPricePerKey < BotKeysAdded)
             {
                 Trade.RemoveItemByDefindex(5021);
                 Bot.log.Warn("I removed Mann Co. Supply Crate Key.");
@@ -591,7 +715,7 @@ namespace SteamBot
 
         public override void OnTradeMessage(string message)
         {
-            Bot.log.Info("[TRADE MESSAGE] " + message);            
+            Bot.log.Info("[TRADE MESSAGE] " + message);
             message = message.ToLower();
 
             if (message == "buy")
@@ -667,6 +791,41 @@ namespace SteamBot
             }
         }
 
+
+        /* NEW */
+        public override void OnNewTradeOffer(TradeOffer offer)
+        {
+            if (IsAdmin)
+            {
+                Log.Success("Recived an trade offer");
+                string tradeid;
+                if (offer.Accept(out tradeid))
+                {
+                    Log.Success("Recived an trade offer");
+                    offer.Accept();
+                    Bot.AcceptAllMobileTradeConfirmations();
+                    Log.Success("Accepted trade offer successfully!");
+                }
+                else
+                {
+                    if (offer.Decline())
+                    {
+                        Log.Info("Declined trade offer : " + offer.TradeOfferId + " from untrusted user " + OtherSID.ConvertToUInt64());
+                    }
+                }
+            }
+        }
+
+        private bool DummyValidation(List<TradeAsset> myAssets, List<TradeAsset> theirAssets)
+        {
+            //compare items etc
+            if (myAssets.Count == theirAssets.Count)
+            {
+                return true;
+            }
+            return false;
+        }
+
         public override void OnTradeAccept()
         {
             if (Validate() || IsAdmin)
@@ -674,12 +833,32 @@ namespace SteamBot
                 bool success = Trade.AcceptTrade();
                 if (success)
                 {
-                    Log.Success("Trade was successful!");
-		
-                    Bot.SteamFriends.SendChatMessage(OtherSID, EChatEntryType.ChatMsg, "Trade was successful! ");
-                    Bot.SteamFriends.SendChatMessage(OtherSID, EChatEntryType.ChatMsg, "your the best!");
-                    Bot.SteamFriends.SendChatMessage(OtherSID, EChatEntryType.ChatMsg, "If you had a issue or concern please leave a comment on my profile!");
-                    Bot.SteamFriends.SetPersonaState(EPersonaState.Online);
+                    if (!ChooseDonate)
+                    {
+                        Bot.SteamFriends.SendChatMessage(OtherSID, EChatEntryType.ChatMsg, "Trying to accept mobile confirmation...");
+                        System.Threading.Thread.Sleep(5000);
+                        {
+                            try
+                            {
+                                Bot.AcceptAllMobileTradeConfirmations();
+                                Log.Success("Trade was successful!");
+
+                                Bot.SteamFriends.SendChatMessage(OtherSID, EChatEntryType.ChatMsg, "Trade was successful! ");
+                                Bot.SteamFriends.SendChatMessage(OtherSID, EChatEntryType.ChatMsg, "your the best!");
+                                Bot.SteamFriends.SendChatMessage(OtherSID, EChatEntryType.ChatMsg, "If you had a issue or concern please leave a comment on my profile!");
+                                Bot.SteamFriends.SetPersonaState(EPersonaState.Online);
+                            }
+                            catch
+                            {
+                                Bot.SteamFriends.SendChatMessage(OtherSID, EChatEntryType.ChatMsg, "Something went wrong please contact my owner if this keeps happening!");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Bot.SteamFriends.SendChatMessage(OtherSID, EChatEntryType.ChatMsg, "Please accept the mobile trade confirmation! and type done when you are ready!");
+                        Bot.SteamFriends.SetPersonaState(EPersonaState.Online);
+                    }
                 }
                 else
                 {
@@ -735,7 +914,7 @@ namespace SteamBot
 
             List<string> errors = new List<string>();
 
-			foreach (TradeUserAssets id in Trade.OtherOfferedItems)
+            foreach (TradeUserAssets id in Trade.OtherOfferedItems)
             {
                 var item = Trade.OtherInventory.GetItem(id.assetid);
                 if (item.Defindex == 5000)
@@ -786,7 +965,7 @@ namespace SteamBot
             }
             else if (UserKeysAdded > 0)
             {
-                Bot.log.Warn("User has " + KeyCount + " key(s) put up. Verifying if " + (float) BotMetalAdded / BuyPricePerKey + " == " + KeyCount + ".");
+                Bot.log.Warn("User has " + KeyCount + " key(s) put up. Verifying if " + (float)BotMetalAdded / BuyPricePerKey + " == " + KeyCount + ".");
                 if (KeyCount != (float)BotMetalAdded / BuyPricePerKey)
                 {
                     errors.Add("Something went wrong. Either you do not have the correct amount of keys or I don't have the correct amount of metal.");
@@ -810,8 +989,8 @@ namespace SteamBot
                 }
                 else if (OverpayNumKeys >= 1)
                 {
-                   errors.Add("You have put up more metal than what I'm asking.");
-                   AskOverpay = true;
+                    errors.Add("You have put up more metal than what I'm asking.");
+                    AskOverpay = true;
                 }
             }
             else if (UserMetalAdded > 0 && !IsOverpaying)
@@ -847,19 +1026,19 @@ namespace SteamBot
             }
             return false;
         }
-        
-        
+
+
         public void TradeCountInventory(bool message)
         {
             // Let's count our inventory
-            
+
             Inventory.Item[] inventory = Trade.MyInventory.Items;
             InventoryMetal = 0;
             InventoryKeys = 0;
             InventoryRef = 0;
             InventoryRec = 0;
             InventoryScrap = 0;
-            Bot.log.Warn("Items on BP: " +inventory.Length);
+            Bot.log.Warn("Items on BP: " + inventory.Length);
             foreach (Inventory.Item item in inventory)
             {
                 if (item.Defindex == 5000)
