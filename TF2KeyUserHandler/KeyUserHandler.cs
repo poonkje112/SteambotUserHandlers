@@ -16,7 +16,7 @@ namespace SteamBot
         //PRICE SETTINGS
         //PRICE IN SCRAPS
         //6.55
-        static int SellPricePerKey = BuyPricePerKey + 4;// price in scrap, e.g. 31 / 9 = 3.55 ref
+        static int SellPricePerKey = 158;// price in scrap, e.g. 31 / 9 = 3.55 ref
         //6.44
         static int BuyPricePerKey = 154; // price in scrap, e.g. 29 / 9 = 3.33 ref
 
