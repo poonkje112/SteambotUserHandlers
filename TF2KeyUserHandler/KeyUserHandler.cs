@@ -13,6 +13,8 @@ namespace SteamBot
     {
         static string BotVersion = "2.4.0";
 
+            // NOTE: TRADE BOT IS NOT ACCEPTING MOBILE TRADE CONFIRMATIONS YOU CAN ADD THIS YOURSELF ( Or wait for an update )
+            // To accept all SENT Trade offers add this "Bot.AcceptAllConfirmations" ( or something like that ) to "OnTradeSuccess"
         //PRICE SETTINGS
         //PRICE IN SCRAPS
         //6.55
